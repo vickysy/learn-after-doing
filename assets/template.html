@@ -97,6 +97,23 @@ h1{font-size:30px;font-weight:900;margin:16px 0 8px;line-height:1.28;color:var(-
 .sayai .sc:active{transform:scale(.96)}
 .sayai .st{color:var(--ink);font-weight:500;margin-top:8px;line-height:1.55}
 .selffix{margin-top:10px;font-size:13px;color:var(--muted)}
+.pattern{background:var(--yellow-soft);border:1px solid #F3E0A6;border-radius:12px;padding:14px 18px;font-size:16px;color:#6a5a34;margin-bottom:14px}
+.pattern b{color:var(--ink)}
+.simgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.simcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:6px}
+.simcard .h{font-weight:800;color:var(--ink);font-size:15px;display:flex;gap:8px;align-items:center}
+.simcard .w{font-size:13px;color:var(--muted)}
+.simcard .go{margin-top:8px}
+.simcard .go button{background:var(--sky);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer}
+.simcard .reuse{display:inline-block;font-size:11px;font-weight:800;color:var(--sky-deep);background:var(--sky-soft);border-radius:6px;padding:2px 9px;align-self:flex-start}
+.simcard .simsay{display:none}
+.method{margin-top:16px;background:var(--soft);border:1px dashed #C9D6EC;border-radius:12px;padding:15px 18px;font-size:15px;color:var(--ink);line-height:1.6}
+.method b{color:var(--sky-deep)}
+.inspo{margin-top:18px}
+.inspo .ih{font-size:14px;font-weight:800;color:var(--sky-deep);margin-bottom:8px}
+.inspo a{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;color:var(--ink);text-decoration:none;font-size:14px;box-shadow:var(--shadow)}
+.inspo a:hover{border-color:var(--sky)}
+.inspo .src{margin-left:auto;font-size:12px;color:var(--muted);flex:none}
 .foot{margin-top:40px;text-align:center;color:var(--muted);font-size:13px}
 .foot b{color:var(--yellow-deep)}
 @media(max-width:640px){
@@ -130,6 +147,12 @@ h1{font-size:30px;font-weight:900;margin:16px 0 8px;line-height:1.28;color:var(-
 
   <div class="sec">坏了怎么修</div>
   <div id="fails"></div>
+
+  <div class="sec" id="secMore" style="display:none">举一反三 · 这套还能怎么用</div>
+  <div id="pattern"></div>
+  <div class="simgrid" id="similar"></div>
+  <div id="method"></div>
+  <div id="inspo"></div>
 
   <div class="foot">🔍 由「拆盲盒」Skill 生成 · <b>木妈 AIdea</b> · 知其然，更知其所以然</div>
 </div>
@@ -190,7 +213,19 @@ const SPEC = {
      cause:"这个网页的正文藏得深，插件没抓全。",
      fix:"换一个「正文型」页面试试。",
      sayToAI:"我的剪藏插件在 __（贴网址）__ 抓到的正文缺失或乱码，帮我加一条适配这个网站的正文抓取规则。"}
-  ]
+  ],
+  pattern: "浏览器抓当前页 → 打包 → 带你的身份，存进某个云端账号。凡是「把眼前网页的东西收进你自己的库」都是这套。",
+  similar: [
+    {icon:"👀", title:"盯梢：页面一变就提醒你", reuses:"「自动抓网页」这块", what:"把「抓一次」变成「定时抓、一有变化就通知」——不是存，是盯。",
+     sayToAI:"我想盯着某个网页（比如报名页、比价页），它一有更新就提醒我，帮我做个这样的小工具。"},
+    {icon:"🤖", title:"存之前先让 AI 判断值不值得看", reuses:"中间加一个「AI 环节」", what:"抓完先过一遍 AI，给你三句话摘要 + 要不要细读的判断。",
+     sayToAI:"我剪藏文章时，想先让 AI 给我三句话摘要、并判断这篇值不值得细读，我再决定存不存。"},
+    {icon:"✂️", title:"选中一段就翻译并存档", reuses:"「只抓你选中的」", what:"抓的不是整页，是你划的那段，中间加一步翻译。",
+     sayToAI:"我看外文资料时，想选中一段就一键翻译成中文，并把原文和译文一起存进我的库。"},
+    {icon:"🔗", title:"一条龙：抓 → 翻译 → 存 → 提醒", reuses:"把几步「串成一条龙」", what:"一个按钮，几件事自动跑完，最后告诉你完成了。",
+     sayToAI:"我看到好的英文文章，想一键完成：抓下来 → 翻译成中文 → 存进我的库 → 给我个完成提醒。"}
+  ],
+  method: "拆完别急着走——问自己：<b>它是由哪几块零件拼的？每一块单独拿出来，还能接到别的需求上干嘛？</b> 换个对象（存到别处）只是最浅那层；把某块零件抽出来干件<b>不一样的事</b>，才是真的举一反三。"
 };
 /*__SPEC_END__*/
 
@@ -275,29 +310,56 @@ SPEC.failures.forEach((f,i)=>{
   fails.appendChild(el);
 });
 
-window.copySay=function(btn){
-  const t=btn.closest(".sayai").querySelector(".st").textContent;
+function doCopy(srcEl,btn){
+  const t=srcEl.textContent;
   if(!btn.dataset.orig)btn.dataset.orig=btn.textContent;
   const ok=()=>{btn.textContent="已复制 ✓";setTimeout(()=>{btn.textContent=btn.dataset.orig;},1600);};
+  const sel=()=>{
+    const r=document.createRange();r.selectNodeContents(srcEl);
+    const s=window.getSelection();s.removeAllRanges();s.addRange(r);
+    btn.textContent="已选中，按 ⌘C";setTimeout(()=>{btn.textContent=btn.dataset.orig;},2200);
+  };
   const legacy=()=>{
     try{
       const ta=document.createElement("textarea");ta.value=t;
       ta.style.cssText="position:fixed;top:0;left:0;opacity:0";
       document.body.appendChild(ta);ta.focus();ta.select();
       const done=document.execCommand("copy");document.body.removeChild(ta);
-      if(done)ok();else selectText(btn);
-    }catch(e){selectText(btn);}
+      if(done)ok();else sel();
+    }catch(e){sel();}
   };
-  const selectText=(b)=>{
-    const st=b.closest(".sayai").querySelector(".st");
-    const r=document.createRange();r.selectNodeContents(st);
-    const s=window.getSelection();s.removeAllRanges();s.addRange(r);
-    b.textContent="已选中，按 ⌘C";setTimeout(()=>{b.textContent=b.dataset.orig;},2200);
-  };
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(t).then(ok).catch(legacy);
-  }else{legacy();}
-};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok).catch(legacy);}else{legacy();}
+}
+window.copySay=function(btn){doCopy(btn.closest(".sayai").querySelector(".st"),btn);};
+window.copySim=function(btn){doCopy(btn.closest(".simcard").querySelector(".simsay"),btn);};
+
+// 举一反三 section
+(function(){
+  const hasMore=SPEC.pattern||(SPEC.similar&&SPEC.similar.length)||(SPEC.inspiration&&SPEC.inspiration.length);
+  if(!hasMore)return;
+  $("#secMore").style.display="";
+  if(SPEC.pattern){const p=document.createElement("div");p.className="pattern";
+    p.innerHTML=`🔑 你其实学会的是这套：<b>${SPEC.pattern}</b>`;$("#pattern").appendChild(p);}
+  (SPEC.similar||[]).forEach(s=>{
+    const el=document.createElement("div");el.className="simcard";
+    const reuse=s.reuses?`<span class="reuse">↩︎ 复用：${s.reuses}</span>`:"";
+    const go=s.sayToAI?`<div class="go"><button onclick="copySim(this)">🗣️ 让 AI 帮我做这个</button></div><span class="simsay">${s.sayToAI}</span>`:"";
+    el.innerHTML=`<div class="h">${s.icon||"💡"} ${s.title}</div>${reuse}<div class="w">${s.what||""}</div>${go}`;
+    $("#similar").appendChild(el);
+  });
+  if(SPEC.method){const m=document.createElement("div");m.className="method";
+    m.innerHTML=`🧠 <b>举一反三的窍门：</b>${SPEC.method}`;$("#method").appendChild(m);}
+  if(SPEC.inspiration&&SPEC.inspiration.length){
+    const box=document.createElement("div");box.className="inspo";
+    box.innerHTML=`<div class="ih">💡 灵感来自（去看看别人怎么玩的）</div>`;
+    SPEC.inspiration.forEach(i=>{
+      const a=document.createElement("a");a.href=i.url;a.target="_blank";a.rel="noopener";
+      a.innerHTML=`<span>🔗 ${i.title}</span><span class="src">${i.source||""}</span>`;
+      box.appendChild(a);
+    });
+    $("#inspo").appendChild(box);
+  }
+})();
 
 window.addEventListener("load",()=>setTimeout(play,600));
 </script>

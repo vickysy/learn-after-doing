@@ -13,6 +13,9 @@
 | `concepts` | array | 关键技术概念，3~5 个，点开渐进展开 |
 | `watch` | string[] | 小白只需盯的点（3 个最佳），可用 `<b>` |
 | `failures` | array | 常见故障 → 原因 → 怎么修 |
+| `pattern` | string | 可迁移的本质模式，一句话（举一反三的钥匙） |
+| `similar` | array | 3~6 个同模式的相似场景，激发举一反三 |
+| `inspiration` | array | 联网搜到的真实相似案例（**只放真链接**） |
 
 ## nodes[]
 
