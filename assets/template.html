@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>拆盲盒 · 可视化原理拆解</title>
+<style>
+:root{
+  --ink:#233350;--muted:#6C7C9A;
+  --yellow:#FFC94D;--yellow-deep:#C9860B;--yellow-soft:#FFF7E1;
+  --sky:#2E9BFF;--sky-deep:#1668C7;--sky-soft:#E9F3FF;
+  --purple:#7C6CF0;--purple-soft:#EFEBFF;
+  --green:#17A567;--green-soft:#E6F7EF;--red:#E5675B;
+  --card:#FFFFFF;--soft:#F1F6FD;--line:rgba(30,60,110,.12);
+  --shadow:0 8px 24px rgba(35,60,110,.09);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",-apple-system,sans-serif;
+  background:radial-gradient(130% 80% at 50% -10%,#EAF3FF 0%,#F6F9FE 46%,#F3F7FC 100%);
+  color:var(--ink);min-height:100vh;padding:32px 18px 64px;-webkit-font-smoothing:antialiased;line-height:1.6}
+.wrap{max-width:940px;margin:0 auto}
+.tag{display:inline-flex;align-items:center;gap:8px;background:var(--yellow-soft);border:1px solid #F3D98A;
+  color:var(--yellow-deep);font-size:14px;font-weight:800;padding:6px 16px;border-radius:999px;letter-spacing:1px}
+h1{font-size:30px;font-weight:900;margin:16px 0 8px;line-height:1.28;color:var(--ink)}
+.essence{background:var(--yellow-soft);border:1px solid #F3E0A6;border-left:5px solid var(--yellow);border-radius:0 14px 14px 0;
+  padding:15px 20px;color:#6a5a34;font-size:16px;margin:14px 0 26px}
+.essence b{color:var(--ink)}
+.sec{margin:32px 0 14px;font-size:15px;font-weight:800;color:var(--sky-deep);letter-spacing:1px;display:flex;align-items:center;gap:8px}
+.sec::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--sky)}
+/* flow */
+.flow{position:relative;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px 20px 20px;box-shadow:var(--shadow)}
+.row{display:flex;align-items:stretch;gap:6px}
+.node{flex:1;background:var(--card);border:1.5px solid var(--line);border-radius:15px;padding:16px 8px;text-align:center;cursor:pointer;
+  transition:transform .2s,border-color .25s,background .25s,box-shadow .25s;min-width:0}
+.node:hover{transform:translateY(-3px);border-color:var(--sky);box-shadow:0 10px 22px rgba(46,155,255,.16)}
+.node.on{border-color:var(--yellow);background:var(--yellow-soft);box-shadow:0 0 0 3px rgba(255,201,77,.35)}
+.node .ic{width:58px;height:58px;margin:0 auto;border-radius:16px;background:var(--sky-soft);
+  display:flex;align-items:center;justify-content:center;font-size:32px;line-height:1;transition:background .25s}
+.node.on .ic{background:#FFEFC2}
+.node .nm{font-size:15px;font-weight:800;margin-top:10px;color:var(--ink)}
+.node .tc{font-size:12px;color:var(--muted);margin-top:4px}
+.node .where{display:inline-block;margin-top:8px;font-size:11px;font-weight:800;padding:2px 9px;border-radius:7px}
+.where.local{background:#E4F6EE;color:#0F7A4E}
+.where.cloud{background:#EAE6FF;color:#5A46C7}
+.arr .net{font-size:11px;margin-top:4px;font-weight:800;text-align:center;line-height:1.2}
+.net.localnet{color:#0F7A4E}
+.net.online{color:#C9860B}
+.arr{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:42px}
+.arr .a{font-size:22px;font-weight:900;color:var(--sky)}
+.arr .l{font-size:11px;text-align:center;margin-top:2px;line-height:1.2;color:var(--muted)}
+.arr.key .l{color:var(--yellow-deep);font-weight:700}
+.dot{position:absolute;width:18px;height:18px;border-radius:50%;background:var(--yellow);
+  box-shadow:0 0 0 5px rgba(255,201,77,.30);opacity:0;transform:translate(-50%,-50%);transition:left .8s ease,top .8s ease,opacity .3s;z-index:3}
+.ctrl{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--yellow);color:#5A4204;font-size:15px;font-weight:800;
+  border:none;border-radius:999px;padding:11px 22px;cursor:pointer;transition:transform .15s,filter .2s;box-shadow:0 6px 16px rgba(255,201,77,.4)}
+.btn:hover{filter:brightness(1.03)}.btn:active{transform:scale(.97)}.btn:disabled{opacity:.5;cursor:default;box-shadow:none}
+.cap{flex:1;min-width:200px;font-size:15px;color:var(--muted)}
+.cap b{color:var(--yellow-deep)}
+/* detail panel */
+.detail{margin-top:14px;background:var(--sky-soft);border:1px solid #CFE4FB;border-radius:14px;padding:16px 18px;font-size:15px;color:#3a5170;display:none}
+.detail.show{display:block}
+.detail .dh{color:var(--ink);font-weight:800;font-size:16px;margin-bottom:6px}
+.detail .dt{display:inline-block;background:#fff;border:1px solid #CFE4FB;color:var(--sky-deep);font-size:12px;font-weight:700;padding:2px 10px;border-radius:6px;margin-bottom:8px}
+/* concepts */
+.chips{display:flex;flex-wrap:wrap;gap:12px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;transition:border-color .2s,box-shadow .2s;flex:1 1 280px;box-shadow:var(--shadow)}
+.chip .q{width:100%;text-align:left;background:none;border:none;color:var(--ink);font-size:15px;font-weight:800;padding:15px 16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;gap:10px}
+.chip .q .plus{color:var(--yellow-deep);font-size:22px;transition:transform .2s;flex:none}
+.chip.open{border-color:var(--yellow);box-shadow:0 8px 22px rgba(255,201,77,.22)}
+.chip.open .q .plus{transform:rotate(45deg)}
+.chip .a{max-height:0;overflow:hidden;transition:max-height .3s ease;color:var(--muted);font-size:14px}
+.chip .a .inner{padding:0 16px 16px}
+.chip .a .more{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);color:#5a6a86}
+.chip .qplain{color:var(--sky-deep);font-weight:500}
+/* watch */
+.watch{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.wc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;gap:12px;align-items:flex-start;box-shadow:var(--shadow)}
+.wc .n{flex:none;width:34px;height:34px;border-radius:10px;background:var(--yellow);color:#5A4204;
+  font-weight:900;display:flex;align-items:center;justify-content:center;font-size:18px}
+.wc .t{font-size:14px;color:var(--ink)}
+.wc .t b{color:var(--sky-deep)}
+/* failures */
+.fail{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:var(--shadow)}
+.fail .fq{width:100%;text-align:left;background:none;border:none;color:var(--ink);font-size:15px;font-weight:800;padding:15px 16px;cursor:pointer;
+  display:flex;align-items:center;gap:10px}
+.fail .fq .sy{color:var(--red);font-size:18px;flex:none}
+.fail .fq .plus{margin-left:auto;color:var(--sky);font-size:22px;transition:transform .2s}
+.fail.open .fq .plus{transform:rotate(45deg)}
+.fail .fa{max-height:0;overflow:hidden;transition:max-height .3s ease;font-size:14px}
+.fail .fa .inner{padding:0 16px 16px;color:var(--muted)}
+.fail .fa .fix{margin-top:8px;color:var(--green)}
+.sayai{margin-top:12px;background:var(--sky-soft);border:1px solid #CFE4FB;border-radius:12px;padding:12px 14px}
+.sayai .sl{color:var(--sky-deep);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sayai .sc{background:var(--sky);color:#fff;border:none;border-radius:8px;padding:5px 14px;font-size:12px;font-weight:800;cursor:pointer;flex:none}
+.sayai .sc:active{transform:scale(.96)}
+.sayai .st{color:var(--ink);font-weight:500;margin-top:8px;line-height:1.55}
+.selffix{margin-top:10px;font-size:13px;color:var(--muted)}
+.foot{margin-top:40px;text-align:center;color:var(--muted);font-size:13px}
+.foot b{color:var(--yellow-deep)}
+@media(max-width:640px){
+  .row{flex-direction:column}.arr{flex-direction:row;min-height:34px;transform:rotate(90deg)}
+  h1{font-size:24px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tag">🔍 拆盲盒 · 知其所以然</div>
+  <h1 id="title"></h1>
+  <div class="essence" id="essence"></div>
+
+  <div class="sec">信息是怎么流动的（点节点看细节）</div>
+  <div class="flow">
+    <div class="dot" id="dot"></div>
+    <div class="row" id="row"></div>
+    <div class="ctrl">
+      <button class="btn" id="play" onclick="play()">▶ 看看点击后发生了什么</button>
+      <div class="cap" id="cap">点上面的按钮，看数据一步步流进结果。也可以直接点每个方块。</div>
+    </div>
+    <div class="detail" id="detail"></div>
+  </div>
+
+  <div class="sec">背后用到的关键概念（点开就懂）</div>
+  <div class="chips" id="chips"></div>
+
+  <div class="sec">你只需盯这几点</div>
+  <div class="watch" id="watch"></div>
+
+  <div class="sec">坏了怎么修</div>
+  <div id="fails"></div>
+
+  <div class="foot">🔍 由「拆盲盒」Skill 生成 · <b>木妈 AIdea</b> · 知其然，更知其所以然</div>
+</div>
+
+<script>
+/* ============================================================
+   拆解规格 SPEC —— Skill 读工程文件后只需替换这个对象。
+   替换 __SPEC_START__ 与 __SPEC_END__ 之间的内容即可。
+   下面是「剪藏插件」实例，同时也是字段说明。
+   ============================================================ */
+/*__SPEC_START__*/
+const SPEC = {
+  title: "剪藏插件：一个网页是怎么进你的 Get 笔记的",
+  essence: "插件就是个<b>跑腿小哥</b>：把你正在看的网页打包成快递，凭你的工牌（登录令牌）送到 Get 笔记的仓库（服务器）入库，你手机上就签收了。",
+  nodes: [
+    {id:"page",   icon:"📄", name:"你在看的网页", tech:"普通 HTML 页面",
+     plain:"就是你正浏览的那个网页。插件要从这里把内容取出来——它本身什么都没变。"},
+    {id:"ext",    icon:"🧩", name:"浏览器插件", tech:"内容脚本 + 正文抓取",
+     plain:"装在浏览器里的一小段程序。你一点「加入我的 Get 笔记」，它就读取当前网页的标题、正文、网址，打包成一小包数据。"},
+    {id:"server", icon:"☁️", name:"Get 笔记服务器", tech:"API 接口 + 数据库",
+     plain:"Get 笔记在云端的大脑。收到数据后先核对你的身份，再把这条笔记写进数据库。"},
+    {id:"app",    icon:"📱", name:"你的 Get 笔记", tech:"多端同步",
+     plain:"服务器存好后自动同步到你的手机 / 电脑，你打开就看到这条新笔记了。"}
+  ],
+  flows: [
+    {from:"page", to:"ext",    label:"读取+打包",
+     detail:"插件抓取网页的标题、正文、URL，打包成一小包结构化数据（JSON）。"},
+    {from:"ext",  to:"server", label:"API 请求 · 带令牌", key:true,
+     detail:"通过一次网络请求（HTTP API）把数据发给服务器，请求里带上你的登录令牌（token）——这是为了证明「这是你」，才能存进你的账号。"},
+    {from:"server", to:"app",  label:"存库+同步",
+     detail:"服务器验证令牌 → 把笔记写进你账号的数据库 → 推送同步到你的所有设备。"}
+  ],
+  concepts: [
+    {term:"浏览器插件", plain:"浏览器里的小程序，能读你当前网页、加按钮。",
+     more:"它需要你授权才能访问页面内容，也能在后台悄悄发网络请求。剪藏、翻译、广告拦截，都是插件。"},
+    {term:"API 请求", plain:"两个软件之间「打电话」的方式。",
+     more:"插件按约定格式（通常是 HTTP POST + JSON）把数据发到服务器的一个网址（接口），服务器处理完回一个结果。"},
+    {term:"令牌 token", plain:"你的临时工牌，证明「这是你」。",
+     more:"登录后服务器发给你一串令牌，之后每次请求带上它就不用重新登录。令牌会过期，过期就要重新登录。"},
+    {term:"数据库", plain:"服务器存东西的仓库，你每条笔记都是里面一行记录。",
+     more:"按账号分区存储，所以别人看不到你的，你换设备也能同步到自己的内容。"}
+  ],
+  watch: [
+    "插件有没有<b>读到</b>网页 —— 点了有没有反应",
+    "请求有没有<b>带上你的令牌</b> —— 说白了就是有没有登录",
+    "服务器有没有<b>存成功</b> —— 笔记有没有真的出现"
+  ],
+  failures: [
+    {symptom:"点了没反应",
+     cause:"插件还没被叫醒——多半是没开启，或没允许它读当前网页。",
+     fix:"去浏览器扩展设置里把它打开、允许读取页面。",
+     sayToAI:"我的 Get笔记剪藏插件点了没反应，帮我确认它有没有启用、有没有页面权限，缺什么帮我补上。"},
+    {symptom:"提示失败、存不进去",
+     cause:"它不确定「你是谁」了——通常是没登录，或登录凭证过期了。",
+     fix:"重新登录 Get笔记再点一次。",
+     sayToAI:"我的 Get笔记剪藏插件提示存不进去，可能是没登录或令牌过期，帮我确认怎么重新登录、或直接帮我处理好。"},
+    {symptom:"存进去了，但正文缺失或乱码",
+     cause:"这个网页的正文藏得深，插件没抓全。",
+     fix:"换一个「正文型」页面试试。",
+     sayToAI:"我的剪藏插件在 __（贴网址）__ 抓到的正文缺失或乱码，帮我加一条适配这个网站的正文抓取规则。"}
+  ]
+};
+/*__SPEC_END__*/
+
+/* ================= 渲染器（无需改动） ================= */
+const $=(s,r=document)=>r.querySelector(s);
+const nodeById={};SPEC.nodes.forEach(n=>nodeById[n.id]=n);
+$("#title").textContent=SPEC.title;
+$("#essence").innerHTML=SPEC.essence;
+
+const row=$("#row");
+SPEC.nodes.forEach((n,i)=>{
+  const d=document.createElement("div");d.className="node";d.id="nd_"+n.id;
+  d.innerHTML=`<div class="ic">${n.icon}</div><div class="nm">${n.name}</div><div class="tc">${n.tech}</div>`
+    +(n.where?`<div class="where ${n.scope||'local'}">${n.where}</div>`:"");
+  d.onclick=()=>showNode(n.id);
+  row.appendChild(d);
+  const f=SPEC.flows[i];
+  if(f){const a=document.createElement("div");a.className="arr"+(f.key?" key":"");
+    a.innerHTML=`<div class="a">➜</div><div class="l">${f.label.replace(/ · /g,"<br>")}</div>`
+      +(f.net?`<div class="net ${f.net==='online'?'online':'localnet'}">${f.net==='online'?'🌐 联网':'🔒 本机内'}</div>`:"");row.appendChild(a);}
+});
+
+function showNode(id){
+  SPEC.nodes.forEach(n=>$("#nd_"+n.id).classList.toggle("on",n.id===id));
+  const n=nodeById[id];const det=$("#detail");
+  det.className="detail show";
+  det.innerHTML=`<div class="dt">${n.tech}</div><div class="dh">${n.icon} ${n.name}</div><div>${n.plain}</div>`;
+}
+
+function ctr(el){const w=$("#row").getBoundingClientRect();const r=el.getBoundingClientRect();
+  return{x:r.left-w.left+r.width/2, y:r.top-w.top+r.height/2};}
+function play(){
+  const dot=$("#dot"),btn=$("#play"),cap=$("#cap");
+  SPEC.nodes.forEach(n=>$("#nd_"+n.id).classList.remove("on"));
+  $("#detail").className="detail";
+  const p0=ctr($("#nd_"+SPEC.nodes[0].id));
+  dot.style.left=p0.x+"px";dot.style.top=p0.y+"px";dot.style.opacity="1";
+  btn.disabled=true;
+  const seq=[{node:SPEC.nodes[0].id,txt:"① 你点了「加入我的 Get 笔记」——插件被唤醒。"}];
+  SPEC.flows.forEach((f,i)=>seq.push({node:f.to,txt:`${["","②","③","④","⑤"][i+1]} ${f.detail}`}));
+  seq.forEach((s,i)=>setTimeout(()=>{
+    const el=$("#nd_"+s.node),c=ctr(el);
+    dot.style.left=c.x+"px";dot.style.top=c.y+"px";
+    el.classList.add("on");
+    cap.innerHTML=s.txt;
+    const nd=nodeById[s.node];
+    $("#detail").className="detail show";
+    $("#detail").innerHTML=`<div class="dt">${nd.tech}</div><div class="dh">${nd.icon} ${nd.name}</div><div>${nd.plain}</div>`;
+    if(i===seq.length-1)setTimeout(()=>{dot.style.opacity="0";btn.disabled=false;btn.innerHTML="↻ 再看一遍";},1000);
+  }, i*1400));
+}
+
+const chips=$("#chips");
+SPEC.concepts.forEach((c,i)=>{
+  const el=document.createElement("div");el.className="chip";el.id="chip_"+i;
+  el.innerHTML=`<button class="q"><span><span>${c.term}</span> · <span class="qplain">${c.plain}</span></span><span class="plus">＋</span></button>
+    <div class="a"><div class="inner">${c.plain}<div class="more">${c.more}</div></div></div>`;
+  el.querySelector(".q").onclick=()=>{
+    const open=el.classList.toggle("open");
+    const a=el.querySelector(".a");a.style.maxHeight=open?a.querySelector(".inner").scrollHeight+"px":"0";
+  };
+  chips.appendChild(el);
+});
+
+const watch=$("#watch");
+SPEC.watch.forEach((w,i)=>{
+  const el=document.createElement("div");el.className="wc";
+  el.innerHTML=`<div class="n">${i+1}</div><div class="t">${w}</div>`;watch.appendChild(el);
+});
+
+const fails=$("#fails");
+SPEC.failures.forEach((f,i)=>{
+  const el=document.createElement("div");el.className="fail";
+  const say=f.sayToAI?`<div class="sayai"><div class="sl"><span>🗣️ 一键交给 AI 修</span><button class="sc" onclick="copySay(this)">复制发给 AI</button></div><div class="st">${f.sayToAI}</div></div>`:"";
+  const self=f.fix?`<div class="selffix">想自己弄：${f.fix}</div>`:"";
+  el.innerHTML=`<button class="fq"><span class="sy">⚠</span><span>${f.symptom}</span><span class="plus">＋</span></button>
+    <div class="fa"><div class="inner"><b style="color:var(--ink)">大白话原因：</b>${f.cause}${say}${self}</div></div>`;
+  el.querySelector(".fq").onclick=()=>{
+    const open=el.classList.toggle("open");
+    const a=el.querySelector(".fa");a.style.maxHeight=open?a.querySelector(".inner").scrollHeight+"px":"0";
+  };
+  fails.appendChild(el);
+});
+
+window.copySay=function(btn){
+  const t=btn.closest(".sayai").querySelector(".st").textContent;
+  if(!btn.dataset.orig)btn.dataset.orig=btn.textContent;
+  const ok=()=>{btn.textContent="已复制 ✓";setTimeout(()=>{btn.textContent=btn.dataset.orig;},1600);};
+  const legacy=()=>{
+    try{
+      const ta=document.createElement("textarea");ta.value=t;
+      ta.style.cssText="position:fixed;top:0;left:0;opacity:0";
+      document.body.appendChild(ta);ta.focus();ta.select();
+      const done=document.execCommand("copy");document.body.removeChild(ta);
+      if(done)ok();else selectText(btn);
+    }catch(e){selectText(btn);}
+  };
+  const selectText=(b)=>{
+    const st=b.closest(".sayai").querySelector(".st");
+    const r=document.createRange();r.selectNodeContents(st);
+    const s=window.getSelection();s.removeAllRanges();s.addRange(r);
+    b.textContent="已选中，按 ⌘C";setTimeout(()=>{b.textContent=b.dataset.orig;},2200);
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(ok).catch(legacy);
+  }else{legacy();}
+};
+
+window.addEventListener("load",()=>setTimeout(play,600));
+</script>
+</body>
+</html>
